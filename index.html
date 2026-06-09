@@ -48,13 +48,16 @@
 
       <h3>System requirements</h3>
       <ul>
-        <li>Windows 10 or Windows 11 (64-bit)</li>
+        <li data-os="windows">Windows 10 or Windows 11 (64-bit)</li>
+        <li data-os="macos">macOS on Apple Silicon (M1 or newer). Intel-based Macs are not supported.</li>
         <li>A microphone</li>
         <li>An internet connection (required for the first launch; also used to check for updates)</li>
       </ul>
 
       <h2>How to install</h2>
-      <ol>
+
+      <!-- Windows steps — shown to Windows visitors by app.js (applyInstructionsForOS). -->
+      <ol data-os="windows">
         <li>
           <strong>Step 1 — Download</strong><br />
           Click the download button above to get the <code>.msi</code> installer.
@@ -74,6 +77,42 @@
         <li>
           <strong>Step 3 — Install and launch</strong><br />
           Follow the on-screen steps to finish the installation, then open Pace IAS Pronunciation Practice.
+        </li>
+        <li>
+          <strong>Step 4 — First launch</strong><br />
+          The first time you open the app, it will download a speech model
+          (about <strong>339 MB</strong>).
+          This takes a few minutes and requires an internet connection.
+          Later launches do not need to download it again.
+        </li>
+      </ol>
+
+      <!-- macOS steps — shown to macOS visitors by app.js (applyInstructionsForOS). -->
+      <ol data-os="macos">
+        <li>
+          <strong>Step 1 — Download</strong><br />
+          Click the download button above to get the <code>.dmg</code> disk image.
+          It is built for Apple Silicon Macs (M1 or newer).
+        </li>
+        <li>
+          <strong>Step 2 — Open the disk image</strong><br />
+          Double-click the downloaded <code>.dmg</code>, then drag
+          <strong>Pace IAS Pronunciation Practice</strong> into your
+          <strong>Applications</strong> folder.
+        </li>
+        <li>
+          <strong>Step 3 — Open it the first time</strong><br />
+          Because the app is not yet notarized by Apple, macOS may say it
+          <em>"cannot be opened because it is from an unidentified developer"</em>
+          or <em>"Apple could not verify…"</em> This is expected.
+          <br /><br />
+          Open your <strong>Applications</strong> folder, <strong>Control-click</strong>
+          (or right-click) the app, choose <strong>Open</strong>, then click
+          <strong>Open</strong> in the dialog.
+          <br /><br />
+          If macOS only offers <em>Move to Trash</em>, open
+          <strong>System Settings → Privacy &amp; Security</strong>, scroll down,
+          and click <strong>Open Anyway</strong>, then open the app again.
         </li>
         <li>
           <strong>Step 4 — First launch</strong><br />

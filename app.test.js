@@ -8,7 +8,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { detectOS, pickWindowsInstaller, fetchLatestRelease, chooseAction } from "./app.js";
+import { detectOS, pickWindowsInstaller, pickMacInstaller, fetchLatestRelease, chooseAction } from "./app.js";
 
 // ─── detectOS ───────────────────────────────────────────────────────────────
 
@@ -117,6 +117,43 @@ describe("pickWindowsInstaller", () => {
     const secondMsi = { name: "Other_0.2.0_x64.msi", browser_download_url: "https://example.com/other.msi" };
     const result = pickWindowsInstaller([msiAsset, secondMsi]);
     assert.deepEqual(result, msiAsset);
+  });
+
+  it("returns null when the list contains only a .dmg (no .msi)", () => {
+    assert.equal(pickWindowsInstaller([dmgAsset]), null);
+  });
+});
+
+// ─── pickMacInstaller ─────────────────────────────────────────────────────────
+
+describe("pickMacInstaller", () => {
+  const dmgAsset = {
+    name: "PaceIAS_0.2.0_aarch64.dmg",
+    browser_download_url: "https://github.com/example/releases/download/app-v0.2.0/PaceIAS_0.2.0_aarch64.dmg",
+  };
+  const msiAsset = {
+    name: "PaceIAS_0.2.0_x64_en-US.msi",
+    browser_download_url: "https://github.com/example/releases/download/app-v0.2.0/PaceIAS_0.2.0_x64_en-US.msi",
+  };
+  const latestJsonAsset = {
+    name: "latest.json",
+    browser_download_url: "https://github.com/example/releases/download/app-v0.2.0/latest.json",
+  };
+
+  it("returns the .dmg asset from a list containing only the disk image", () => {
+    assert.deepEqual(pickMacInstaller([dmgAsset]), dmgAsset);
+  });
+
+  it("returns null when the list contains only a .msi (no .dmg)", () => {
+    assert.equal(pickMacInstaller([msiAsset]), null);
+  });
+
+  it("returns null for an empty asset list", () => {
+    assert.equal(pickMacInstaller([]), null);
+  });
+
+  it("picks the .dmg from a realistic mixed list (.msi + .dmg + latest.json)", () => {
+    assert.deepEqual(pickMacInstaller([msiAsset, latestJsonAsset, dmgAsset]), dmgAsset);
   });
 });
 
@@ -284,14 +321,53 @@ describe("chooseAction", () => {
     assert.equal(view.kind, "fetchFailed");
   });
 
-  // ── Non-Windows → unsupported ──────────────────────────────────
+  // ── macOS download / not-published (parallels Windows) ─────────
 
-  it("returns kind:unsupported for macOS regardless of release state", () => {
-    const release = { version: "v0.2.0", notes: "", assets: [msiAsset] };
+  const dmgAsset = {
+    name: "PaceIAS_0.2.0_aarch64.dmg",
+    browser_download_url: "https://github.com/WatsonWBlair/IAS/releases/download/app-v0.2.0/PaceIAS_0.2.0_aarch64.dmg",
+  };
+
+  it("returns kind:download (os macos) when macOS and a trusted .dmg is present", () => {
+    const release = { version: "app-v0.2.0", notes: "", assets: [dmgAsset] };
     const view = chooseAction("macos", release);
-    assert.equal(view.kind, "unsupported");
+    assert.equal(view.kind, "download");
+    assert.equal(view.os, "macos");
+    assert.equal(view.href, dmgAsset.browser_download_url);
+    assert.equal(view.version, "0.2.0");
+  });
+
+  it("returns kind:notPublished (os macos) when macOS but only a .msi is present (no .dmg)", () => {
+    const release = { version: "app-v0.2.0", notes: "", assets: [msiAsset] };
+    const view = chooseAction("macos", release);
+    assert.equal(view.kind, "notPublished");
     assert.equal(view.os, "macos");
   });
+
+  it("picks the .dmg for macOS even when a .msi is also present", () => {
+    const release = { version: "v0.2.0", notes: "", assets: [msiAsset, dmgAsset] };
+    const view = chooseAction("macos", release);
+    assert.equal(view.kind, "download");
+    assert.equal(view.href, dmgAsset.browser_download_url);
+  });
+
+  it("returns kind:notPublished when the macOS .dmg URL is not from a trusted GitHub origin", () => {
+    const untrustedDmg = { name: "app.dmg", browser_download_url: "https://evil.example/app.dmg" };
+    const release = { version: "v0.2.0", notes: "", assets: [untrustedDmg] };
+    const view = chooseAction("macos", release);
+    assert.equal(view.kind, "notPublished");
+    assert.equal(view.os, "macos");
+  });
+
+  it("returns kind:fetchFailed when macOS and releaseOrError is an Error", () => {
+    assert.equal(chooseAction("macos", new Error("offline")).kind, "fetchFailed");
+  });
+
+  it("returns kind:fetchFailed when macOS and releaseOrError is null (pre-fetch)", () => {
+    assert.equal(chooseAction("macos", null).kind, "fetchFailed");
+  });
+
+  // ── other (Linux/mobile/unknown) → unsupported ─────────────────
 
   it("returns kind:unsupported for other (Linux/Android/mobile) regardless of release state", () => {
     const view = chooseAction("other", new Error("offline"));
@@ -299,9 +375,11 @@ describe("chooseAction", () => {
     assert.equal(view.os, "other");
   });
 
-  it("returns kind:unsupported for non-Windows even when fetch failed (error is irrelevant)", () => {
-    const view = chooseAction("macos", null);
+  it("returns kind:unsupported for other even when a .dmg/.msi is present (no installer offered)", () => {
+    const release = { version: "v0.2.0", notes: "", assets: [msiAsset, dmgAsset] };
+    const view = chooseAction("other", release);
     assert.equal(view.kind, "unsupported");
+    assert.equal(view.os, "other");
   });
 
   // ── Origin allowlist: untrusted .msi URL → notPublished ──────────
