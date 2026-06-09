@@ -280,4 +280,38 @@ describe("chooseAction", () => {
     const view = chooseAction("macos", null);
     assert.equal(view.kind, "unsupported");
   });
+
+  // ── Origin allowlist: untrusted .msi URL → notPublished ──────────
+
+  it("returns kind:notPublished when the .msi URL is not from a trusted GitHub origin", () => {
+    const untrustedAsset = {
+      name: "installer.msi",
+      browser_download_url: "https://evil.example/x.msi",
+    };
+    const release = { version: "v0.2.0", notes: "", assets: [untrustedAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "notPublished");
+  });
+
+  it("returns kind:download when the .msi URL starts with https://github.com/ (trusted origin)", () => {
+    const trustedAsset = {
+      name: "installer.msi",
+      browser_download_url: "https://github.com/WatsonWBlair/IAS/releases/download/v1.0.0/installer.msi",
+    };
+    const release = { version: "v1.0.0", notes: "", assets: [trustedAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "download");
+    assert.equal(view.href, trustedAsset.browser_download_url);
+  });
+
+  it("returns kind:download when the .msi URL starts with https://objects.githubusercontent.com/ (trusted origin)", () => {
+    const trustedAsset = {
+      name: "installer.msi",
+      browser_download_url: "https://objects.githubusercontent.com/github-production-release-asset-2e65be/installer.msi",
+    };
+    const release = { version: "v1.0.0", notes: "", assets: [trustedAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "download");
+    assert.equal(view.href, trustedAsset.browser_download_url);
+  });
 });

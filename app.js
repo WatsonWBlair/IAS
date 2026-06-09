@@ -7,7 +7,7 @@
  * Exports (pure, Node-safe):
  *   detectOS, pickWindowsInstaller, fetchLatestRelease, chooseAction
  *
- * DOM layer (browser-only, guarded):
+ * DOM layer (browser-only, guarded, not exported):
  *   applyView, init
  */
 
@@ -123,7 +123,14 @@ export function chooseAction(os, releaseOrError) {
   const installer = pickWindowsInstaller(release.assets);
 
   if (installer) {
-    return { kind: "download", href: installer.browser_download_url, version: release.version };
+    const url = installer.browser_download_url;
+    const trusted =
+      url.startsWith("https://github.com/") ||
+      url.startsWith("https://objects.githubusercontent.com/");
+    if (!trusted) {
+      return { kind: "notPublished" };
+    }
+    return { kind: "download", href: url, version: release.version };
   }
 
   return { kind: "notPublished" };
@@ -142,7 +149,7 @@ const API_URL = "https://api.github.com/repos/WatsonWBlair/IAS/releases/latest";
  * @param {{kind: string, href?: string, version?: string, os?: string}} view
  * @param {Document} doc
  */
-export function applyView(view, doc) {
+function applyView(view, doc) {
   const actionSlot = doc.getElementById("action-slot");
   const versionLabel = doc.getElementById("version-label");
 
@@ -150,8 +157,10 @@ export function applyView(view, doc) {
 
   switch (view.kind) {
     case "download": {
-      actionSlot.innerHTML =
-        `<a href="${view.href}">Download for Windows (.msi)</a>`;
+      const a = doc.createElement("a");
+      a.href = view.href;
+      a.textContent = "Download for Windows (.msi)";
+      actionSlot.replaceChildren(a);
       if (versionLabel) versionLabel.textContent = view.version ?? "";
       break;
     }
