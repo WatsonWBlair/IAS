@@ -1,0 +1,170 @@
+/* ================================================================
+   Global Pathways — download page styles
+   Vanilla CSS, no framework, no external fonts.
+   System font stack for fast, dependency-free rendering.
+   ================================================================ */
+
+/* ── Reset / base ─────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  background: #f8f9fa;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+
+.container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+/* ── Header / hero ────────────────────────────────────────────── */
+
+#os-region {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+#os-region h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  color: #0a1f44;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #555;
+}
+
+/* ── Action area ──────────────────────────────────────────────── */
+
+.action-area {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+#action-slot {
+  display: inline-block;
+  min-height: 3rem;
+}
+
+.placeholder {
+  color: #777;
+  font-style: italic;
+  margin: 0;
+}
+
+/* Task 3 will inject a <a> or <button> into #action-slot.
+   Pre-style it so the button looks right without extra JS work. */
+#action-slot a,
+#action-slot button {
+  display: inline-block;
+  padding: 0.75rem 1.75rem;
+  background: #0a5fd8;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#action-slot a:hover,
+#action-slot button:hover {
+  background: #0849b0;
+}
+
+#action-slot a:focus-visible,
+#action-slot button:focus-visible {
+  outline: 3px solid #0a5fd8;
+  outline-offset: 3px;
+}
+
+.version-label {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: #777;
+  min-height: 1.2em; /* reserve space so layout doesn't shift */
+}
+
+/* ── Instructions ─────────────────────────────────────────────── */
+
+#instructions {
+  background: #fff;
+  border: 1px solid #dde1e7;
+  border-radius: 8px;
+  padding: 1.75rem 2rem;
+}
+
+#instructions h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0a1f44;
+  margin: 1.5rem 0 0.5rem;
+}
+
+#instructions h2:first-child {
+  margin-top: 0;
+}
+
+#instructions h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 1rem 0 0.4rem;
+}
+
+#instructions ol,
+#instructions ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.4rem;
+}
+
+#instructions li {
+  margin-bottom: 0.75rem;
+}
+
+#instructions li:last-child {
+  margin-bottom: 0;
+}
+
+#instructions code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.875em;
+  background: #f0f2f5;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+#instructions p {
+  margin: 0 0 0.5rem;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  #os-region h1 {
+    font-size: 1.6rem;
+  }
+
+  #instructions {
+    padding: 1.25rem 1rem;
+  }
+}
