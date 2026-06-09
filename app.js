@@ -77,10 +77,14 @@ export function pickMacInstaller(assets) {
  *
  * @param {string} repoUrl - GitHub API list URL, e.g.
  *   "https://api.github.com/repos/WatsonWBlair/IAS/releases?per_page=100"
+ * Carries each release's `prerelease`/`draft` flags through so `selectLatestArchive`
+ * can skip not-ready builds (a prerelease is visible to an unauthenticated fetch and
+ * would otherwise outrank the newest stable archive).
+ *
  * @param {function} [fetchFn] - Injectable fetch implementation; defaults to
  *   the global `fetch` when not supplied (browser / Node 18+).
- * @returns {Promise<Array<{tag_name: string, assets: Array<{name: string, browser_download_url: string}>}>>}
- * @throws {Error} when the HTTP response is not ok (status >= 400).
+ * @returns {Promise<Array<{tag_name: string, prerelease: boolean, draft: boolean, assets: Array<{name: string, browser_download_url: string}>}>>}
+ * @throws {Error} when the HTTP response is not ok (non-2xx).
  */
 export async function fetchReleases(
   repoUrl = "https://api.github.com/repos/WatsonWBlair/IAS/releases?per_page=100",
@@ -97,6 +101,8 @@ export async function fetchReleases(
 
   return list.map((release) => ({
     tag_name: release.tag_name,
+    prerelease: release.prerelease === true,
+    draft: release.draft === true,
     assets: (release.assets ?? []).map(({ name, browser_download_url }) => ({
       name,
       browser_download_url,
@@ -159,7 +165,10 @@ export function compareSemver(a, b) {
  * → graceful fallback). `version` is already the clean, suffix-stripped semver,
  * suitable to pass straight to the changelog's `selectNotes`.
  *
- * @param {Array<{tag_name: string, assets: Array}>} releases
+ * Skips any release flagged `prerelease` or `draft` even when its semver is
+ * highest — a learner must never be handed a not-ready build.
+ *
+ * @param {Array<{tag_name: string, prerelease?: boolean, draft?: boolean, assets: Array}>} releases
  * @param {"windows"|"macos"|"other"} os
  * @returns {{version: string, assets: Array<{name: string, browser_download_url: string}>} | null}
  */
@@ -171,6 +180,10 @@ export function selectLatestArchive(releases, os) {
   for (const release of releases) {
     const parsed = parseArchiveTag(release && release.tag_name);
     if (!parsed || parsed.platform !== os) continue;
+    // Never offer a not-ready build: skip prereleases/drafts even if their semver
+    // outranks the newest stable archive. (Drafts are invisible to unauthenticated
+    // fetches anyway; prereleases are visible, so this is the live guard.)
+    if (release.prerelease === true || release.draft === true) continue;
     if (best === null || compareSemver(parsed.version, best.version) > 0) {
       best = {
         version: parsed.version,
@@ -251,6 +264,8 @@ export function chooseAction(os, releaseOrError) {
 // Full releases list (NOT /releases/latest, which #101 froze at app-v0.2.2):
 // the fallback must land a learner on a page that shows the current version.
 const RELEASES_URL = "https://github.com/WatsonWBlair/IAS/releases";
+// per_page=100: the API returns releases newest-first, so the newest per-platform
+// archive is always on page 1 — a single page suffices, no pagination needed.
 const RELEASES_API_URL =
   "https://api.github.com/repos/WatsonWBlair/IAS/releases?per_page=100";
 

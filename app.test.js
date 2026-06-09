@@ -220,6 +220,19 @@ describe("fetchReleases", () => {
     assert.equal(archive.assets[0].download_count, undefined);
   });
 
+  it("carries prerelease/draft flags, defaulting absent flags to false", async () => {
+    const payload = [
+      { tag_name: "app-v0.3.0-win", prerelease: true, draft: false, assets: [] },
+      { tag_name: "app-v0.2.3-win", assets: [] }, // flags absent
+    ];
+    const result = await fetchReleases("https://api.example.com/releases", fakeFetch(payload));
+    assert.equal(result[0].prerelease, true);
+    assert.equal(result[0].draft, false);
+    // absent flags normalize to false, never undefined
+    assert.equal(result[1].prerelease, false);
+    assert.equal(result[1].draft, false);
+  });
+
   it("handles a release with no assets key (→ empty assets array)", async () => {
     const result = await fetchReleases(
       "https://api.example.com/releases",
@@ -394,6 +407,21 @@ describe("selectLatestArchive", () => {
     const result = selectLatestArchive(messy, "windows");
     assert.equal(result.version, "0.2.3");
     assert.deepEqual(result.assets, []);
+  });
+
+  it("skips a higher-semver prerelease archive (never serves a not-ready build)", () => {
+    const list = [
+      { tag_name: "app-v0.3.0-win", prerelease: true, assets: [winMsi("0.3.0")] },
+      { tag_name: "app-v0.2.3-win", prerelease: false, assets: [winMsi("0.2.3")] },
+    ];
+    const result = selectLatestArchive(list, "windows");
+    assert.equal(result.version, "0.2.3");
+    assert.deepEqual(result.assets, [winMsi("0.2.3")]);
+  });
+
+  it("skips a draft archive even when it is the only candidate (→ null)", () => {
+    const list = [{ tag_name: "app-v0.3.0-win", draft: true, assets: [winMsi("0.3.0")] }];
+    assert.equal(selectLatestArchive(list, "windows"), null);
   });
 });
 
