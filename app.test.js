@@ -8,7 +8,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { detectOS, pickWindowsInstaller, fetchLatestRelease } from "./app.js";
+import { detectOS, pickWindowsInstaller, fetchLatestRelease, chooseAction } from "./app.js";
 
 // ─── detectOS ───────────────────────────────────────────────────────────────
 
@@ -210,5 +210,74 @@ describe("fetchLatestRelease", () => {
 
     await fetchLatestRelease("https://api.example.com/test-url", capturingFetch);
     assert.equal(capturedUrl, "https://api.example.com/test-url");
+  });
+});
+
+// ─── chooseAction ────────────────────────────────────────────────────────────
+
+describe("chooseAction", () => {
+  const msiAsset = {
+    name: "Global.Pathways_0.2.0_x64_en-US.msi",
+    browser_download_url: "https://github.com/example/releases/download/v0.2.0/installer.msi",
+  };
+  const onnxAsset = {
+    name: "model-v2.onnx",
+    browser_download_url: "https://github.com/example/releases/download/v0.2.0/model-v2.onnx",
+  };
+
+  // ── Windows + .msi present → download ──────────────────────────
+
+  it("returns kind:download when Windows and a .msi asset is present", () => {
+    const release = { version: "v0.2.0", notes: "", assets: [msiAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "download");
+    assert.equal(view.href, msiAsset.browser_download_url);
+    assert.equal(view.version, "v0.2.0");
+  });
+
+  // ── Windows + fetch success + no .msi → notPublished ───────────
+
+  it("returns kind:notPublished when Windows but no .msi in assets", () => {
+    const release = { version: "model-v2", notes: "", assets: [onnxAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "notPublished");
+  });
+
+  it("returns kind:notPublished when Windows and asset list is empty", () => {
+    const release = { version: "v0.1.0", notes: "", assets: [] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "notPublished");
+  });
+
+  // ── Windows + fetch error → fetchFailed ────────────────────────
+
+  it("returns kind:fetchFailed when Windows and releaseOrError is an Error", () => {
+    const view = chooseAction("windows", new Error("GitHub API returned 403"));
+    assert.equal(view.kind, "fetchFailed");
+  });
+
+  it("returns kind:fetchFailed when Windows and releaseOrError is null (pre-fetch)", () => {
+    const view = chooseAction("windows", null);
+    assert.equal(view.kind, "fetchFailed");
+  });
+
+  // ── Non-Windows → unsupported ──────────────────────────────────
+
+  it("returns kind:unsupported for macOS regardless of release state", () => {
+    const release = { version: "v0.2.0", notes: "", assets: [msiAsset] };
+    const view = chooseAction("macos", release);
+    assert.equal(view.kind, "unsupported");
+    assert.equal(view.os, "macos");
+  });
+
+  it("returns kind:unsupported for other (Linux/Android/mobile) regardless of release state", () => {
+    const view = chooseAction("other", new Error("offline"));
+    assert.equal(view.kind, "unsupported");
+    assert.equal(view.os, "other");
+  });
+
+  it("returns kind:unsupported for non-Windows even when fetch failed (error is irrelevant)", () => {
+    const view = chooseAction("macos", null);
+    assert.equal(view.kind, "unsupported");
   });
 });

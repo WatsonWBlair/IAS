@@ -3,6 +3,12 @@
  *
  * Loadable as a browser ES module (<script type="module">) and by
  * Node's built-in test runner ("node --test").
+ *
+ * Exports (pure, Node-safe):
+ *   detectOS, pickWindowsInstaller, fetchLatestRelease, chooseAction
+ *
+ * DOM layer (browser-only, guarded):
+ *   applyView, init
  */
 
 /**
@@ -76,4 +82,182 @@ export async function fetchLatestRelease(
       browser_download_url,
     })),
   };
+}
+
+// ─── View-model ──────────────────────────────────────────────────────────────
+
+/**
+ * Decide what to show based on detected OS and the fetch outcome.
+ *
+ * Pure function — no DOM, no side effects. Safe to call in Node tests.
+ *
+ * @param {"windows"|"macos"|"other"} os
+ * @param {{version: string, assets: Array<{name: string, browser_download_url: string}>} | Error | null} releaseOrError
+ *   Pass the resolved release object on success, an Error on fetch failure,
+ *   or null when called before the fetch resolves (pre-fetch state).
+ * @returns {
+ *   {kind: "download", href: string, version: string} |
+ *   {kind: "notPublished"} |
+ *   {kind: "fetchFailed"} |
+ *   {kind: "unsupported", os: string}
+ * }
+ */
+export function chooseAction(os, releaseOrError) {
+  // Non-Windows visitors always get the "unsupported" view regardless of fetch state.
+  if (os !== "windows") {
+    return { kind: "unsupported", os };
+  }
+
+  // Windows + fetch not yet resolved (null) → treat as fetchFailed (pre-hydration fallback).
+  if (releaseOrError === null) {
+    return { kind: "fetchFailed" };
+  }
+
+  // Windows + fetch error.
+  if (releaseOrError instanceof Error) {
+    return { kind: "fetchFailed" };
+  }
+
+  // Windows + fetch success.
+  const release = releaseOrError;
+  const installer = pickWindowsInstaller(release.assets);
+
+  if (installer) {
+    return { kind: "download", href: installer.browser_download_url, version: release.version };
+  }
+
+  return { kind: "notPublished" };
+}
+
+// ─── DOM layer (browser-only) ─────────────────────────────────────────────────
+
+const RELEASES_URL = "https://github.com/WatsonWBlair/IAS/releases/latest";
+const API_URL = "https://api.github.com/repos/WatsonWBlair/IAS/releases/latest";
+
+/**
+ * Apply a view-model to the live document.
+ * Replaces the contents of #action-slot and fills #version-label.
+ * Does NOT modify #os-region — that is handled by init() directly.
+ *
+ * @param {{kind: string, href?: string, version?: string, os?: string}} view
+ * @param {Document} doc
+ */
+export function applyView(view, doc) {
+  const actionSlot = doc.getElementById("action-slot");
+  const versionLabel = doc.getElementById("version-label");
+
+  if (!actionSlot) return;
+
+  switch (view.kind) {
+    case "download": {
+      actionSlot.innerHTML =
+        `<a href="${view.href}">Download for Windows (.msi)</a>`;
+      if (versionLabel) versionLabel.textContent = view.version ?? "";
+      break;
+    }
+
+    case "notPublished": {
+      actionSlot.innerHTML =
+        `<a href="${RELEASES_URL}">Go to the downloads page</a>` +
+        `<p class="note">The Windows installer has not been published yet. ` +
+        `Check the downloads page for the latest release.</p>`;
+      if (versionLabel) versionLabel.textContent = "";
+      break;
+    }
+
+    case "fetchFailed": {
+      actionSlot.innerHTML =
+        `<a href="${RELEASES_URL}">Go to the downloads page</a>` +
+        `<p class="note">We could not load release information right now. ` +
+        `Use the link above to go to the downloads page directly.</p>`;
+      if (versionLabel) versionLabel.textContent = "";
+      break;
+    }
+
+    case "unsupported": {
+      // #action-slot: no active download button — clear the slot entirely.
+      actionSlot.innerHTML = "";
+      if (versionLabel) versionLabel.textContent = "";
+      break;
+    }
+  }
+}
+
+/**
+ * Paint the OS-region hero text for non-Windows visitors.
+ *
+ * @param {"windows"|"macos"|"other"} os
+ * @param {Document} doc
+ */
+function applyOsRegion(os, doc) {
+  const osRegion = doc.getElementById("os-region");
+  if (!osRegion) return;
+
+  if (os !== "windows") {
+    osRegion.innerHTML =
+      `<h1>Global Pathways</h1>` +
+      `<p class="subtitle">English language practice for everyday life</p>` +
+      `<p class="os-notice">` +
+        `There is no download for your system yet — ` +
+        `please contact the Pace IAS office.` +
+      `</p>` +
+      `<p><a href="${RELEASES_URL}" class="releases-link">See all downloads</a></p>`;
+  }
+  // Windows visitors keep the default static markup; nothing to change.
+}
+
+/**
+ * Mark the instructions block as Windows-only for non-Windows visitors.
+ *
+ * @param {"windows"|"macos"|"other"} os
+ * @param {Document} doc
+ */
+function applyInstructionsLabel(os, doc) {
+  const instructions = doc.getElementById("instructions");
+  if (!instructions || os === "windows") return;
+
+  const notice = doc.createElement("p");
+  notice.className = "os-notice";
+  notice.textContent = "Note: These instructions are for Windows only.";
+  instructions.prepend(notice);
+}
+
+/**
+ * Main entry point — runs on DOMContentLoaded in the browser.
+ * Detects OS synchronously, paints the hero, then fetches the release
+ * and applies the resulting view (catching errors into the fetchFailed path).
+ *
+ * Exported for testing the wiring logic in isolation if needed.
+ */
+export async function init() {
+  const os = detectOS();
+
+  // Paint the hero synchronously, before the fetch resolves.
+  applyOsRegion(os, document);
+  applyInstructionsLabel(os, document);
+
+  // Show a pre-fetch fallback in the action slot for Windows visitors
+  // while the fetch is in flight.
+  if (os === "windows") {
+    applyView({ kind: "fetchFailed" }, document);
+  } else {
+    applyView({ kind: "unsupported", os }, document);
+  }
+
+  // Fetch the release and apply the real view.
+  try {
+    const release = await fetchLatestRelease(API_URL);
+    applyView(chooseAction(os, release), document);
+  } catch (err) {
+    // Don't surface raw error text to the learner — fetchFailed view handles it.
+    applyView(chooseAction(os, err), document);
+  }
+}
+
+// ─── Browser bootstrap ────────────────────────────────────────────────────────
+
+// Guard: only auto-run when a real browser document is present.
+// Importing this module under `node --test` must not touch the DOM or throw.
+if (typeof document !== "undefined") {
+  document.addEventListener("DOMContentLoaded", init);
 }
