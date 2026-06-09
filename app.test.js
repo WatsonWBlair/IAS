@@ -232,7 +232,30 @@ describe("chooseAction", () => {
     const view = chooseAction("windows", release);
     assert.equal(view.kind, "download");
     assert.equal(view.href, msiAsset.browser_download_url);
-    assert.equal(view.version, "v0.2.0");
+    // v-prefix is stripped for display
+    assert.equal(view.version, "0.2.0");
+  });
+
+  it("strips app-v prefix from tag_name in the download view's version (e.g. app-v0.2.0 → 0.2.0)", () => {
+    const trustedAsset = {
+      name: "installer.msi",
+      browser_download_url: "https://github.com/WatsonWBlair/IAS/releases/download/app-v0.2.0/installer.msi",
+    };
+    const release = { version: "app-v0.2.0", notes: "", assets: [trustedAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "download");
+    assert.equal(view.version, "0.2.0");
+  });
+
+  it("leaves a bare version string unchanged in the download view (e.g. 0.2.0 → 0.2.0)", () => {
+    const trustedAsset = {
+      name: "installer.msi",
+      browser_download_url: "https://github.com/WatsonWBlair/IAS/releases/download/0.2.0/installer.msi",
+    };
+    const release = { version: "0.2.0", notes: "", assets: [trustedAsset] };
+    const view = chooseAction("windows", release);
+    assert.equal(view.kind, "download");
+    assert.equal(view.version, "0.2.0");
   });
 
   // ── Windows + fetch success + no .msi → notPublished ───────────

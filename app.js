@@ -130,7 +130,9 @@ export function chooseAction(os, releaseOrError) {
     if (!trusted) {
       return { kind: "notPublished" };
     }
-    return { kind: "download", href: url, version: release.version };
+    const rawTag = release.version ?? "";
+    const cleanVersion = rawTag.replace(/^(app-v|v)/, "");
+    return { kind: "download", href: url, version: cleanVersion };
   }
 
   return { kind: "notPublished" };
@@ -161,7 +163,7 @@ function applyView(view, doc) {
       a.href = view.href;
       a.textContent = "Download for Windows (.msi)";
       actionSlot.replaceChildren(a);
-      if (versionLabel) versionLabel.textContent = view.version ?? "";
+      if (versionLabel) versionLabel.textContent = view.version ? `Version ${view.version}` : "";
       break;
     }
 
