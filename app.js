@@ -20,8 +20,11 @@ export function detectOS(uaOrPlatform) {
 
   const s = ua.toLowerCase();
 
-  // iOS must come before the generic macOS/Apple check because iPads
-  // report "Macintosh" in their UA string on modern Safari.
+  // Catch UAs that contain an explicit iOS/iPadOS token (iphone, ipad, ipod).
+  // Note: an iPad in "Request Desktop Site" mode sends a UA with "Macintosh"
+  // and NO ipad/iphone/ipod token, so it is NOT caught here — it falls through
+  // to the macOS branch and is classified as "macos". That is acceptable: both
+  // "macos" and "other" route to the same "no build for your system" state.
   if (/iphone|ipad|ipod/.test(s)) return "other";
 
   if (/windows/.test(s)) return "windows";

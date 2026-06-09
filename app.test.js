@@ -43,11 +43,21 @@ describe("detectOS", () => {
   });
 
   it("classifies an iOS (iPad) user-agent as other", () => {
-    // Modern iPadOS fakes a desktop UA with 'Macintosh' — must still be caught
+    // This UA contains the literal 'iPad' token, so the iOS guard fires.
+    // An iPad in "Request Desktop Site" mode omits that token entirely and
+    // sends 'Macintosh' instead — that case is classified as "macos", which
+    // is acceptable because both "macos" and "other" reach the same
+    // "no build for your system" state.
     const ua =
       "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) " +
       "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
     assert.equal(detectOS(ua), "other");
+  });
+
+  it("returns other when called with no argument in a Node environment (navigator undefined)", () => {
+    // In Node, navigator is undefined; detectOS() must not throw and must
+    // return "other" (empty UA string matches no known OS token).
+    assert.equal(detectOS(), "other");
   });
 
   it("classifies an Android user-agent as other", () => {
