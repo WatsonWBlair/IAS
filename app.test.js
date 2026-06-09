@@ -45,9 +45,9 @@ describe("detectOS", () => {
   it("classifies an iOS (iPad) user-agent as other", () => {
     // This UA contains the literal 'iPad' token, so the iOS guard fires.
     // An iPad in "Request Desktop Site" mode omits that token entirely and
-    // sends 'Macintosh' instead — that case is classified as "macos", which
-    // is acceptable because both "macos" and "other" reach the same
-    // "no build for your system" state.
+    // sends 'Macintosh' instead — that case is classified as "macos", so it is
+    // offered the macOS download (which an iPad cannot run). That is a rare
+    // edge case and the macOS install steps make the intended target clear.
     const ua =
       "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) " +
       "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
