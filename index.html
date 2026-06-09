@@ -29,7 +29,12 @@
       <!-- Task 3 injects a download button (Windows) or a
            "not available for your system" message here. -->
       <div id="action-slot">
-        <p class="placeholder">Checking for the latest version&hellip;</p>
+        <a href="https://github.com/WatsonWBlair/IAS/releases/latest">
+          Go to the downloads page
+        </a>
+        <noscript>
+          <p>JavaScript is not available in your browser. Use the link above to go to the downloads page directly.</p>
+        </noscript>
       </div>
       <!-- Task 3 injects the release version string here, e.g. "v1.2.0" -->
       <p id="version-label" class="version-label"></p>
@@ -43,7 +48,7 @@
       <ul>
         <li>Windows 10 or Windows 11 (64-bit)</li>
         <li>A microphone</li>
-        <li>An internet connection for the first launch</li>
+        <li>An internet connection (required for the first launch; also used to check for updates)</li>
       </ul>
 
       <h2>How to install</h2>
