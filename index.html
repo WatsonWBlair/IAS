@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Global Pathways — Download</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+
+    <!-- ============================================================
+         DOM HOOK IDs — used by Task 3's render layer (do not rename):
+           #os-region      — OS-conditional hero / message area
+           #action-slot    — primary-action slot (download button or
+                             "not supported" message injected here)
+           #version-label  — version string injected here
+           #instructions   — always-visible install instructions block
+         ============================================================ -->
+
+    <!-- (a) OS-conditional hero / message region -->
+    <header id="os-region">
+      <h1>Global Pathways</h1>
+      <p class="subtitle">English language practice for everyday life</p>
+    </header>
+
+    <!-- (b) Primary-action slot + (c) version label -->
+    <section class="action-area" aria-label="Download">
+      <!-- Task 3 injects a download button (Windows) or a
+           "not available for your system" message here. -->
+      <div id="action-slot">
+        <p class="placeholder">Checking for the latest version&hellip;</p>
+      </div>
+      <!-- Task 3 injects the release version string here, e.g. "v1.2.0" -->
+      <p id="version-label" class="version-label"></p>
+    </section>
+
+    <!-- (d) Always-visible install instructions block -->
+    <section id="instructions" aria-label="Installation instructions">
+      <h2>Before you install</h2>
+
+      <h3>System requirements</h3>
+      <ul>
+        <li>Windows 10 or Windows 11 (64-bit)</li>
+        <li>A microphone</li>
+        <li>An internet connection for the first launch</li>
+      </ul>
+
+      <h2>How to install</h2>
+      <ol>
+        <li>
+          <strong>Step 1 — Download</strong><br />
+          Click the download button above to get the <code>.msi</code> installer.
+        </li>
+        <li>
+          <strong>Step 2 — SmartScreen warning</strong><br />
+          Windows may show a message that says <em>"Windows protected your PC"</em>
+          or <em>"unrecognized app."</em>
+          This is expected. The installer is not yet code-signed, so Windows does not
+          recognize it yet.
+          <br /><br />
+          Click <strong>More info</strong>, then click <strong>Run anyway</strong>.
+          <br /><br />
+          <em>Note:</em> This warning will appear again on every update.
+          Each update is a new installer — there are no silent background patches.
+        </li>
+        <li>
+          <strong>Step 3 — Install and launch</strong><br />
+          Follow the on-screen steps to finish the installation, then open Global Pathways.
+        </li>
+        <li>
+          <strong>Step 4 — First launch</strong><br />
+          The first time you open the app, it will download a speech model
+          (about <strong>339 MB</strong>).
+          This takes a few minutes and requires an internet connection.
+          Later launches do not need to download it again.
+        </li>
+      </ol>
+
+      <h2>Your privacy</h2>
+      <p>
+        Your practice audio is processed on-device —
+        no audio recordings leave your computer.
+        The app does connect to the internet to download the speech model on first launch
+        and to check for updates.
+      </p>
+
+      <h2>Need help?</h2>
+      <p>Questions? Contact the Pace IAS office.</p>
+    </section>
+
+  </main>
+</body>
+</html>
