@@ -8,7 +8,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { detectOS, pickWindowsInstaller, pickMacInstaller, fetchLatestRelease, chooseAction } from "./app.js";
+import {
+  detectOS,
+  pickWindowsInstaller,
+  pickMacInstaller,
+  fetchReleases,
+  parseArchiveTag,
+  compareSemver,
+  selectLatestArchive,
+  chooseAction,
+} from "./app.js";
 
 // ─── detectOS ───────────────────────────────────────────────────────────────
 
@@ -157,9 +166,9 @@ describe("pickMacInstaller", () => {
   });
 });
 
-// ─── fetchLatestRelease ─────────────────────────────────────────────────────
+// ─── fetchReleases ──────────────────────────────────────────────────────────
 
-describe("fetchLatestRelease", () => {
+describe("fetchReleases", () => {
   /** Build a minimal fake fetch that returns the supplied data with ok:true */
   function fakeFetch(payload, { status = 200, ok = true } = {}) {
     return async (_url) => ({
@@ -169,55 +178,67 @@ describe("fetchLatestRelease", () => {
     });
   }
 
-  const sampleApiResponse = {
-    tag_name: "app-v0.2.0",
-    body: "First public release.",
-    assets: [
-      {
-        name: "Global.Pathways_0.2.0_x64_en-US.msi",
-        browser_download_url: "https://github.com/example/releases/download/app-v0.2.0/Global.Pathways_0.2.0_x64_en-US.msi",
-        // extra fields that the normalizer should discard
-        size: 12345678,
-        download_count: 42,
-      },
-      {
-        name: "latest.json",
-        browser_download_url: "https://github.com/example/releases/download/app-v0.2.0/latest.json",
-        size: 256,
-        download_count: 99,
-      },
-    ],
-  };
+  const sampleListResponse = [
+    {
+      tag_name: "app-v0.2.3-win",
+      body: "ignored by the normalizer",
+      assets: [
+        {
+          name: "P3.Platform_0.2.3_x64_en-US.msi",
+          browser_download_url: "https://github.com/WatsonWBlair/IAS/releases/download/app-v0.2.3-win/P3.Platform_0.2.3_x64_en-US.msi",
+          // extra fields the normalizer should discard
+          size: 12345678,
+          download_count: 42,
+        },
+      ],
+    },
+    {
+      tag_name: "win-stable",
+      assets: [
+        {
+          name: "latest.json",
+          browser_download_url: "https://github.com/WatsonWBlair/IAS/releases/download/win-stable/latest.json",
+          size: 256,
+        },
+      ],
+    },
+  ];
 
-  it("normalizes tag_name → version, body → notes, and trims asset fields", async () => {
-    const result = await fetchLatestRelease("https://api.example.com/releases/latest", fakeFetch(sampleApiResponse));
+  it("returns an array, normalizing tag_name + asset {name, browser_download_url} only", async () => {
+    const result = await fetchReleases("https://api.example.com/releases", fakeFetch(sampleListResponse));
 
-    assert.equal(result.version, "app-v0.2.0");
-    assert.equal(result.notes, "First public release.");
-    assert.equal(result.assets.length, 2);
+    assert.ok(Array.isArray(result));
+    assert.equal(result.length, 2);
 
-    const [msi, json] = result.assets;
-    assert.equal(msi.name, "Global.Pathways_0.2.0_x64_en-US.msi");
-    assert.ok(msi.browser_download_url.endsWith(".msi"));
-    // extra fields should NOT be present on normalized assets
-    assert.equal(msi.size, undefined);
-    assert.equal(msi.download_count, undefined);
-
-    assert.equal(json.name, "latest.json");
+    const [archive] = result;
+    assert.equal(archive.tag_name, "app-v0.2.3-win");
+    assert.equal(archive.assets.length, 1);
+    assert.equal(archive.assets[0].name, "P3.Platform_0.2.3_x64_en-US.msi");
+    assert.ok(archive.assets[0].browser_download_url.endsWith(".msi"));
+    // extra fields stripped
+    assert.equal(archive.assets[0].size, undefined);
+    assert.equal(archive.assets[0].download_count, undefined);
   });
 
-  it("handles a release with no assets (assets array absent)", async () => {
-    const result = await fetchLatestRelease(
-      "https://api.example.com/releases/latest",
-      fakeFetch({ tag_name: "app-v0.1.0", body: "early", /* no assets key */ })
+  it("handles a release with no assets key (→ empty assets array)", async () => {
+    const result = await fetchReleases(
+      "https://api.example.com/releases",
+      fakeFetch([{ tag_name: "app-v0.1.0-win" /* no assets key */ }])
     );
-    assert.deepEqual(result.assets, []);
+    assert.deepEqual(result[0].assets, []);
   });
 
-  it("throws when the API returns a non-200 status", async () => {
-    const notFoundFetch = fakeFetch({}, { status: 404, ok: false });
+  it("returns an empty array when the payload is not an array", async () => {
+    // The /releases LIST endpoint returns an array; a non-array (e.g. a rate-limit
+    // object) must degrade to [] rather than crash the resolver.
+    const result = await fetchReleases("https://api.example.com/releases", fakeFetch({ message: "rate limited" }));
+    assert.deepEqual(result, []);
+  });
+
+  it("throws when the API returns a non-200 status (404)", async () => {
+    const notFoundFetch = fakeFetch([], { status: 404, ok: false });
     await assert.rejects(
-      () => fetchLatestRelease("https://api.example.com/releases/latest", notFoundFetch),
+      () => fetchReleases("https://api.example.com/releases", notFoundFetch),
       (err) => {
         assert.ok(err instanceof Error);
         assert.ok(err.message.includes("404"), `expected '404' in: ${err.message}`);
@@ -227,9 +248,9 @@ describe("fetchLatestRelease", () => {
   });
 
   it("throws when the API returns a 500 status", async () => {
-    const serverErrorFetch = fakeFetch({}, { status: 500, ok: false });
+    const serverErrorFetch = fakeFetch([], { status: 500, ok: false });
     await assert.rejects(
-      () => fetchLatestRelease("https://api.example.com/releases/latest", serverErrorFetch),
+      () => fetchReleases("https://api.example.com/releases", serverErrorFetch),
       (err) => {
         assert.ok(err instanceof Error);
         assert.ok(err.message.includes("500"), `expected '500' in: ${err.message}`);
@@ -242,11 +263,137 @@ describe("fetchLatestRelease", () => {
     let capturedUrl = null;
     const capturingFetch = async (url) => {
       capturedUrl = url;
-      return { ok: true, status: 200, json: async () => ({ tag_name: "v1", body: "", assets: [] }) };
+      return { ok: true, status: 200, json: async () => [] };
     };
 
-    await fetchLatestRelease("https://api.example.com/test-url", capturingFetch);
+    await fetchReleases("https://api.example.com/test-url", capturingFetch);
     assert.equal(capturedUrl, "https://api.example.com/test-url");
+  });
+});
+
+// ─── parseArchiveTag ──────────────────────────────────────────────────────────
+
+describe("parseArchiveTag", () => {
+  it("parses a Windows archive tag → clean version + windows", () => {
+    assert.deepEqual(parseArchiveTag("app-v0.2.3-win"), { version: "0.2.3", platform: "windows" });
+  });
+
+  it("parses a macOS archive tag → clean version + macos", () => {
+    assert.deepEqual(parseArchiveTag("app-v0.2.3-mac"), { version: "0.2.3", platform: "macos" });
+  });
+
+  it("rejects a channel pointer tag (win-stable)", () => {
+    assert.equal(parseArchiveTag("win-stable"), null);
+    assert.equal(parseArchiveTag("mac-stable"), null);
+  });
+
+  it("rejects the legacy combined tag with no platform suffix (app-v0.2.2)", () => {
+    assert.equal(parseArchiveTag("app-v0.2.2"), null);
+  });
+
+  it("rejects a speech-model tag (model-v0.1.0)", () => {
+    assert.equal(parseArchiveTag("model-v0.1.0"), null);
+  });
+
+  it("rejects malformed / unknown-suffix / non-string input", () => {
+    assert.equal(parseArchiveTag("app-v0.2.3-linux"), null);
+    assert.equal(parseArchiveTag("app-vX.Y.Z-win"), null);
+    assert.equal(parseArchiveTag("app-v0.2-win"), null); // not MAJOR.MINOR.PATCH
+    assert.equal(parseArchiveTag(""), null);
+    assert.equal(parseArchiveTag(null), null);
+    assert.equal(parseArchiveTag(undefined), null);
+    assert.equal(parseArchiveTag(123), null);
+  });
+});
+
+// ─── compareSemver ────────────────────────────────────────────────────────────
+
+describe("compareSemver", () => {
+  it("orders patch numerically, not lexically (0.2.10 > 0.2.9)", () => {
+    assert.ok(compareSemver("0.2.10", "0.2.9") > 0);
+    assert.ok(compareSemver("0.2.9", "0.2.10") < 0);
+  });
+
+  it("returns 0 for equal versions", () => {
+    assert.equal(compareSemver("1.2.3", "1.2.3"), 0);
+  });
+
+  it("orders major and minor", () => {
+    assert.ok(compareSemver("1.0.0", "0.9.9") > 0);
+    assert.ok(compareSemver("0.3.0", "0.2.9") > 0);
+  });
+
+  it("does not throw on a pre-release/garbage component (parses as 0)", () => {
+    assert.doesNotThrow(() => compareSemver("0.2.3-beta.1", "0.2.3"));
+    assert.doesNotThrow(() => compareSemver("x.y.z", "0.0.0"));
+  });
+});
+
+// ─── selectLatestArchive ──────────────────────────────────────────────────────
+
+describe("selectLatestArchive", () => {
+  // A realistic mixed listing: two platform archives, the channel pointers,
+  // the legacy combined release, and the speech model — newest-first as the API returns.
+  const winMsi = (v) => ({
+    name: `P3.Platform_${v}_x64_en-US.msi`,
+    browser_download_url: `https://github.com/WatsonWBlair/IAS/releases/download/app-v${v}-win/P3.Platform_${v}_x64_en-US.msi`,
+  });
+  const macDmg = (v) => ({
+    name: `P3.Platform_${v}_aarch64.dmg`,
+    browser_download_url: `https://github.com/WatsonWBlair/IAS/releases/download/app-v${v}-mac/P3.Platform_${v}_aarch64.dmg`,
+  });
+
+  const listing = [
+    { tag_name: "mac-stable", assets: [{ name: "latest.json", browser_download_url: "https://github.com/x/y/releases/download/mac-stable/latest.json" }] },
+    { tag_name: "app-v0.2.3-mac", assets: [macDmg("0.2.3")] },
+    { tag_name: "win-stable", assets: [{ name: "latest.json", browser_download_url: "https://github.com/x/y/releases/download/win-stable/latest.json" }] },
+    { tag_name: "app-v0.2.3-win", assets: [winMsi("0.2.3")] },
+    { tag_name: "app-v0.2.1-win", assets: [winMsi("0.2.1")] },
+    { tag_name: "app-v0.2.2", assets: [winMsi("0.2.2")] }, // legacy combined — ignored
+    { tag_name: "model-v0.1.0", assets: [{ name: "ias-model-0.1.0.onnx", browser_download_url: "https://github.com/x/y/releases/download/model-v0.1.0/ias-model-0.1.0.onnx" }] },
+  ];
+
+  it("picks the newest Windows archive, returning clean version + its assets", () => {
+    const result = selectLatestArchive(listing, "windows");
+    assert.equal(result.version, "0.2.3");
+    assert.deepEqual(result.assets, [winMsi("0.2.3")]);
+  });
+
+  it("picks the newest macOS archive", () => {
+    const result = selectLatestArchive(listing, "macos");
+    assert.equal(result.version, "0.2.3");
+    assert.deepEqual(result.assets, [macDmg("0.2.3")]);
+  });
+
+  it("selects by semver, not list order (out-of-order list still yields the newest)", () => {
+    const shuffled = [
+      { tag_name: "app-v0.2.1-win", assets: [winMsi("0.2.1")] },
+      { tag_name: "app-v0.2.10-win", assets: [winMsi("0.2.10")] },
+      { tag_name: "app-v0.2.9-win", assets: [winMsi("0.2.9")] },
+    ];
+    assert.equal(selectLatestArchive(shuffled, "windows").version, "0.2.10");
+  });
+
+  it("returns null when no archive matches the OS (macOS absent)", () => {
+    const winOnly = [{ tag_name: "app-v0.2.3-win", assets: [winMsi("0.2.3")] }];
+    assert.equal(selectLatestArchive(winOnly, "macos"), null);
+  });
+
+  it("returns null for an empty list, a non-array, and an unsupported OS", () => {
+    assert.equal(selectLatestArchive([], "windows"), null);
+    assert.equal(selectLatestArchive(null, "windows"), null);
+    assert.equal(selectLatestArchive(listing, "other"), null);
+  });
+
+  it("tolerates entries with a missing/blank tag or assets without throwing", () => {
+    const messy = [
+      {},
+      { tag_name: null },
+      { tag_name: "app-v0.2.3-win" }, // no assets key
+    ];
+    const result = selectLatestArchive(messy, "windows");
+    assert.equal(result.version, "0.2.3");
+    assert.deepEqual(result.assets, []);
   });
 });
 

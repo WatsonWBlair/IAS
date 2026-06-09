@@ -5,7 +5,8 @@
  * Node's built-in test runner ("node --test").
  *
  * Exports (pure, Node-safe):
- *   detectOS, pickWindowsInstaller, pickMacInstaller, fetchLatestRelease, chooseAction
+ *   detectOS, pickWindowsInstaller, pickMacInstaller, fetchReleases,
+ *   parseArchiveTag, compareSemver, selectLatestArchive, chooseAction
  *
  * DOM layer (browser-only, guarded, not exported):
  *   applyView, applyOsRegion, applyInstructionsForOS, init
@@ -63,37 +64,121 @@ export function pickMacInstaller(assets) {
 }
 
 /**
- * Fetch the latest GitHub release and normalize it.
+ * Fetch the repo's release LIST and normalize each entry.
  *
- * @param {string} repoUrl - Full GitHub API URL, e.g.
- *   "https://api.github.com/repos/WatsonWBlair/IAS/releases/latest"
+ * Resolution moved from `/releases/latest` to the full list because per-platform
+ * release channels (#101) create every release `--latest=false`, freezing
+ * `/releases/latest` at the legacy combined `app-v0.2.2`. The current installers
+ * live on the per-platform archive tags (`app-v<ver>-win` / `app-v<ver>-mac`),
+ * which `selectLatestArchive` picks out of this list. We list via api.github.com
+ * (which sends `Access-Control-Allow-Origin: *`) rather than reading the channel
+ * `latest.json` asset, whose host sends no CORS header (so an in-browser fetch
+ * of it is rejected).
+ *
+ * @param {string} repoUrl - GitHub API list URL, e.g.
+ *   "https://api.github.com/repos/WatsonWBlair/IAS/releases?per_page=100"
  * @param {function} [fetchFn] - Injectable fetch implementation; defaults to
  *   the global `fetch` when not supplied (browser / Node 18+).
- * @returns {Promise<{version: string, notes: string, assets: Array<{name: string, browser_download_url: string}>}>}
+ * @returns {Promise<Array<{tag_name: string, assets: Array<{name: string, browser_download_url: string}>}>>}
  * @throws {Error} when the HTTP response is not ok (status >= 400).
  */
-export async function fetchLatestRelease(
-  repoUrl = "https://api.github.com/repos/WatsonWBlair/IAS/releases/latest",
+export async function fetchReleases(
+  repoUrl = "https://api.github.com/repos/WatsonWBlair/IAS/releases?per_page=100",
   fetchFn = globalThis.fetch
 ) {
   const response = await fetchFn(repoUrl);
 
   if (!response.ok) {
-    throw new Error(
-      `GitHub API returned ${response.status} for ${repoUrl}`
-    );
+    throw new Error(`GitHub API returned ${response.status} for ${repoUrl}`);
   }
 
   const data = await response.json();
+  const list = Array.isArray(data) ? data : [];
 
-  return {
-    version: data.tag_name,
-    notes: data.body,
-    assets: (data.assets ?? []).map(({ name, browser_download_url }) => ({
+  return list.map((release) => ({
+    tag_name: release.tag_name,
+    assets: (release.assets ?? []).map(({ name, browser_download_url }) => ({
       name,
       browser_download_url,
     })),
+  }));
+}
+
+/**
+ * Parse a per-platform archive release tag into its clean version and OS.
+ *
+ * Matches ONLY immutable archive tags of the exact form `app-v<MAJOR.MINOR.PATCH>-win`
+ * or `…-mac`. Returns `null` for everything else — channel pointers (`win-stable`),
+ * the speech-model releases (`model-v*`), the legacy combined `app-v0.2.2` (no
+ * platform suffix), and any malformed tag. Pure.
+ *
+ * @param {string} tag
+ * @returns {{version: string, platform: "windows"|"macos"} | null}
+ */
+export function parseArchiveTag(tag) {
+  if (typeof tag !== "string") return null;
+  const match = /^app-v(\d+\.\d+\.\d+)-(win|mac)$/.exec(tag);
+  if (!match) return null;
+  return {
+    version: match[1],
+    platform: match[2] === "win" ? "windows" : "macos",
   };
+}
+
+/**
+ * Compare two `MAJOR.MINOR.PATCH` versions numerically.
+ * Returns >0 when `a` is newer, <0 when older, 0 when equal.
+ * Numeric per-component compare, so `0.2.10` sorts above `0.2.9`. Defensive:
+ * invalid input never throws — a fully non-numeric or missing component parses
+ * as 0 via the `parseInt` fallback. (In production only clean MAJOR.MINOR.PATCH
+ * strings from `parseArchiveTag` reach this; a hyphenated pre-release patch like
+ * `3-beta` would `parseInt` to its numeric prefix — pre-release ordering is out
+ * of scope per the channel-resolution design.)
+ * Pure.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+export function compareSemver(a, b) {
+  const pa = String(a).split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
+ * From a normalized release list, pick the newest per-platform archive for `os`.
+ *
+ * Pure — no DOM, no fetch. Returns a release-shaped object
+ * (`{version: <clean semver>, assets}`) that `chooseAction` consumes unchanged,
+ * or `null` when no archive matches `os` (caller treats null as "not resolvable"
+ * → graceful fallback). `version` is already the clean, suffix-stripped semver,
+ * suitable to pass straight to the changelog's `selectNotes`.
+ *
+ * @param {Array<{tag_name: string, assets: Array}>} releases
+ * @param {"windows"|"macos"|"other"} os
+ * @returns {{version: string, assets: Array<{name: string, browser_download_url: string}>} | null}
+ */
+export function selectLatestArchive(releases, os) {
+  if (!Array.isArray(releases)) return null;
+  if (os !== "windows" && os !== "macos") return null;
+
+  let best = null;
+  for (const release of releases) {
+    const parsed = parseArchiveTag(release && release.tag_name);
+    if (!parsed || parsed.platform !== os) continue;
+    if (best === null || compareSemver(parsed.version, best.version) > 0) {
+      best = {
+        version: parsed.version,
+        assets: Array.isArray(release.assets) ? release.assets : [],
+      };
+    }
+  }
+  return best;
 }
 
 // ─── View-model ──────────────────────────────────────────────────────────────
@@ -163,8 +248,11 @@ export function chooseAction(os, releaseOrError) {
 
 // ─── DOM layer (browser-only) ─────────────────────────────────────────────────
 
-const RELEASES_URL = "https://github.com/WatsonWBlair/IAS/releases/latest";
-const API_URL = "https://api.github.com/repos/WatsonWBlair/IAS/releases/latest";
+// Full releases list (NOT /releases/latest, which #101 froze at app-v0.2.2):
+// the fallback must land a learner on a page that shows the current version.
+const RELEASES_URL = "https://github.com/WatsonWBlair/IAS/releases";
+const RELEASES_API_URL =
+  "https://api.github.com/repos/WatsonWBlair/IAS/releases?per_page=100";
 
 /** Per-OS button label (static — never built from release data). */
 const DOWNLOAD_LABEL = {
@@ -295,8 +383,9 @@ function applyInstructionsForOS(os, doc) {
 
 /**
  * Main entry point — runs on DOMContentLoaded in the browser.
- * Detects OS synchronously, paints the hero and instructions, then fetches the
- * release and applies the resulting view (catching errors into the fetchFailed path).
+ * Detects OS synchronously, paints the hero and instructions, then lists the
+ * releases, resolves the newest per-platform archive, and applies the resulting
+ * view (catching errors — and an unresolvable result — into the fallback path).
  *
  * Exported for testing the wiring logic in isolation if needed.
  */
@@ -314,9 +403,13 @@ export async function init() {
     applyView({ kind: "unsupported", os }, document);
   }
 
-  // Fetch the release and apply the real view.
+  // List releases, resolve the newest per-platform archive, apply the real view.
+  // `selectLatestArchive` returns null when no archive matches this OS; passing
+  // that null through `chooseAction` yields the same graceful fallback as a fetch
+  // error, so the page never shows a dead button.
   try {
-    const release = await fetchLatestRelease(API_URL);
+    const releases = await fetchReleases(RELEASES_API_URL);
+    const release = selectLatestArchive(releases, os);
     applyView(chooseAction(os, release), document);
   } catch (err) {
     // Don't surface raw error text to the learner — fetchFailed view handles it.
