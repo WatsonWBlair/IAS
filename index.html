@@ -3,163 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pace IAS Pronunciation Practice — Download</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css" />
-  <script type="module" src="app.js"></script>
+  <title>Pronounce — the download page has moved</title>
+  <meta name="description" content="The Pronounce download page has moved to pace-ias.github.io/pronounce." />
+  <link rel="canonical" href="https://pace-ias.github.io/pronounce/" />
+  <meta http-equiv="refresh" content="0; url=https://pace-ias.github.io/pronounce/" />
+  <script>
+    // Use replace() so this retired page does not sit in the back-button history.
+    location.replace("https://pace-ias.github.io/pronounce/");
+  </script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+           max-width: 36rem; margin: 4rem auto; padding: 0 1.25rem;
+           line-height: 1.6; color: #25241f; }
+    a { color: #4f6c4e; }
+  </style>
 </head>
 <body>
-  <main class="container">
-
-    <!-- ============================================================
-         DOM HOOK IDs — used by Task 3's render layer (do not rename):
-           #os-region      — OS-conditional hero / message area
-           #action-slot    — primary-action slot (download button or
-                             "not supported" message injected here)
-           #version-label  — version string injected here
-           #instructions   — always-visible install instructions block
-         ============================================================ -->
-
-    <!-- (a) OS-conditional hero / message region -->
-    <header id="os-region">
-      <h1>Pace IAS Pronunciation Practice</h1>
-      <p class="subtitle">English language practice for everyday life</p>
-    </header>
-
-    <!-- (b) Primary-action slot + (c) version label -->
-    <section class="action-area" aria-label="Download">
-      <!-- Task 3 injects a download button (Windows) or a
-           "not available for your system" message here. -->
-      <div id="action-slot">
-        <a href="https://github.com/WatsonWBlair/IAS/releases/latest">
-          Go to the downloads page
-        </a>
-        <noscript>
-          <p>JavaScript is not available in your browser. Use the link above to go to the downloads page directly.</p>
-        </noscript>
-      </div>
-      <!-- Task 3 injects the release version string here, e.g. "v1.2.0" -->
-      <p id="version-label" class="version-label"></p>
-    </section>
-
-    <!-- (d) Always-visible install instructions block -->
-    <section id="instructions" aria-label="Installation instructions">
-      <h2>Before you install</h2>
-
-      <h3>System requirements</h3>
-      <ul>
-        <li data-os="windows">Windows 10 or Windows 11 (64-bit)</li>
-        <li data-os="macos">macOS on Apple Silicon (M1 or newer). Intel-based Macs are not supported.</li>
-        <li>A microphone</li>
-        <li>An internet connection (required for the first launch; also used to check for updates)</li>
-      </ul>
-
-      <h2>How to install</h2>
-
-      <!-- Windows steps — shown to Windows visitors by app.js (applyInstructionsForOS). -->
-      <ol data-os="windows">
-        <li>
-          <strong>Step 1 — Download</strong><br />
-          Click the download button above to get the <code>.msi</code> installer.
-          Your browser saves it to your <strong>Downloads</strong> folder. When the
-          download finishes, open that folder and double-click the <code>.msi</code> file to start.
-        </li>
-        <li>
-          <strong>Step 2 — SmartScreen warning</strong><br />
-          Windows may show a message that says <em>"Windows protected your PC"</em>
-          or <em>"unrecognized app."</em>
-          This is expected. The installer is not yet code-signed, so Windows does not
-          recognize it yet.
-          <br /><br />
-          Click <strong>More info</strong>, then click <strong>Run anyway</strong>.
-          <br /><br />
-          <em>Note:</em> This warning will appear again on every update.
-          Each update is a new installer — there are no silent background patches.
-        </li>
-        <li>
-          <strong>Step 3 — Install and launch</strong><br />
-          Follow the on-screen steps to finish the installation, then open Pace IAS Pronunciation Practice.
-        </li>
-        <li>
-          <strong>Step 4 — First launch</strong><br />
-          The first time you open the app, it will download a speech model
-          (about <strong>339 MB</strong>).
-          This takes a few minutes and requires an internet connection.
-          Later launches do not need to download it again.
-        </li>
-      </ol>
-
-      <!-- macOS steps — shown to macOS visitors by app.js (applyInstructionsForOS). -->
-      <ol data-os="macos">
-        <li>
-          <strong>Step 1 — Download</strong><br />
-          Click the download button above to get the <code>.dmg</code> disk image.
-          It is built for Apple Silicon Macs (M1 or newer).
-          Your browser saves it to your <strong>Downloads</strong> folder. When the
-          download finishes, open that folder to find the <code>.dmg</code> file.
-        </li>
-        <li>
-          <strong>Step 2 — Open the disk image</strong><br />
-          Double-click the downloaded <code>.dmg</code>, then drag
-          <strong>Pace IAS Pronunciation Practice</strong> into your
-          <strong>Applications</strong> folder.
-        </li>
-        <li>
-          <strong>Step 3 — Open it the first time</strong><br />
-          Because the app is not yet notarized by Apple, macOS may say it
-          <em>"cannot be opened because it is from an unidentified developer"</em>
-          or <em>"Apple could not verify…"</em> This is expected.
-          <br /><br />
-          Open your <strong>Applications</strong> folder, <strong>Control-click</strong>
-          (or right-click) the app, choose <strong>Open</strong>, then click
-          <strong>Open</strong> in the dialog.
-          <br /><br />
-          If macOS only offers <em>Move to Trash</em>, open
-          <strong>System Settings → Privacy &amp; Security</strong>, scroll down,
-          and click <strong>Open Anyway</strong>, then open the app again.
-        </li>
-        <li>
-          <strong>Step 4 — First launch</strong><br />
-          The first time you open the app, it will download a speech model
-          (about <strong>339 MB</strong>).
-          This takes a few minutes and requires an internet connection.
-          Later launches do not need to download it again.
-        </li>
-      </ol>
-
-      <h2>Keeping the app up to date</h2>
-      <p>
-        Sometimes we publish a new version here. You can get updates in either of two ways:
-      </p>
-      <ul>
-        <li>
-          <strong>Let the app notify you.</strong> Open <strong>Settings</strong> in the app and turn on
-          <strong>Check for updates</strong> (this is off until you turn it on). After that, when a new
-          version is ready, the app shows a small <em>"Update available"</em> message with a
-          <strong>Download update</strong> button. Click it and the new installer downloads in your browser.
-        </li>
-        <li>
-          <strong>Or check this page yourself</strong> at any time and download the latest version.
-        </li>
-      </ul>
-      <p>
-        Either way, updating works just like the first install: open the downloaded installer and run it.
-        Follow the same steps as above. The security warning appears again each time, because every update
-        is a complete new installer — there are no silent background updates. Your saved settings stay in place.
-      </p>
-
-      <h2>Your privacy</h2>
-      <p>
-        Your practice audio is processed on-device —
-        no audio recordings leave your computer.
-        The app does connect to the internet to download the speech model on first launch
-        and to check for updates.
-      </p>
-
-      <h2>Need help?</h2>
-      <p>Questions? Contact the Pace IAS office.</p>
-    </section>
-
+  <main>
+    <h1>This page has moved</h1>
+    <p>
+      The Pronounce download page now lives at
+      <a href="https://pace-ias.github.io/pronounce/">pace-ias.github.io/pronounce</a>.
+    </p>
+    <p>If you are not redirected automatically, use the link above.</p>
   </main>
 </body>
 </html>
